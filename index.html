@@ -23,11 +23,12 @@ body {
 
 h1{
   text-align:center;
-  margin-bottom:10px;
+  margin-bottom:15px;
+  font-size:28px; /* 放大标题 */
 }
 
 .time{
-  font-size:18px;
+  font-size:20px; /* 放大时间 */
   margin-bottom:15px;
   color:#555;
   text-align:center;
@@ -35,16 +36,16 @@ h1{
 
 .controls{
   display:flex;
-  gap:10px;
+  gap:12px;
   margin-bottom:15px;
 }
 
 button{
   flex:1;
-  padding:14px;
+  padding:16px;
   border:none;
   border-radius:12px;
-  font-size:16px;
+  font-size:18px; /* 放大按钮文字 */
   cursor:pointer;
 }
 
@@ -59,15 +60,15 @@ button{
 }
 
 .export{
-  background:#3b82f6;
+  background:#facc15; /* 黄色底 */
   color:white;
 }
 
 select{
-  margin:10px 0;
+  margin:12px 0;
   width:100%;
-  padding:10px;
-  font-size:16px;
+  padding:12px;
+  font-size:18px; /* 放大下拉文字 */
 }
 
 .columns{
@@ -79,33 +80,42 @@ select{
 .col{
   flex:1;
   background:#fafafa;
-  padding:10px;
+  padding:12px;
   border-radius:10px;
   text-align:center;
 }
 
+.col h3{
+  font-size:20px; /* 放大列标题 */
+  margin-bottom:12px;
+}
+
 .item{
-  font-size:13px;
+  font-size:15px; /* 放大列表文字 */
   padding:6px;
   border-bottom:1px solid #eee;
 }
 
 .compare{
-  font-size:11px;
+  font-size:13px; /* 放大对比文字 */
 }
 
 .earlier{ color:green; }
 .later{ color:red; }
 
 .chartbox{
-  margin-top:25px;
+  margin-top:20px;
+}
+
+canvas{
+  max-height:150px; /* 缩小图表高度 */
 }
 
 .stats{
   margin-top:15px;
-  font-size:13px;
+  font-size:16px; /* 放大统计文字 */
   background:#f9fafb;
-  padding:10px;
+  padding:12px;
   border-radius:10px;
 }
 </style>
@@ -137,7 +147,7 @@ select{
   </div>
 
   <div class="chartbox">
-    <canvas id="chart" height="200"></canvas>
+    <canvas id="chart"></canvas>
   </div>
 
   <div class="stats" id="stats"></div>
