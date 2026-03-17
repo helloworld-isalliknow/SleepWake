@@ -75,7 +75,7 @@ select{
 .stats-container{
   display:flex;
   gap:10px;
-  margin-bottom:60px;
+  margin-bottom:30px;
 }
 
 .stats-col{
@@ -381,7 +381,12 @@ function updateStats(data){
     }
   });
 
-  function fmtTime(m){ if(!m && m!==0) return "-"; let h=Math.floor(m/60); let mm=Math.round(m%60); return h+":"+(mm<10?'0':'')+mm; }
+  function fmtTime(m){ 
+    if(!m && m!==0) return "-"; 
+    let h=Math.floor(m/60); 
+    let mm=Math.round(m%60); 
+    return h+":"+(mm<10?'0':'')+mm; 
+  }
 
   function avgBedtime(sleepArr,wakeArr){
     if(sleepArr.length===0 || wakeArr.length===0) return "-";
@@ -399,19 +404,38 @@ function updateStats(data){
   document.getElementById("weekendStats").innerHTML=
     `<b>Weekend Avg</b><br>Sleep: ${fmtTime(avg(weekendSleep))}<br>Wake: ${fmtTime(avg(weekendWake))}<br>Bedtime: ${avgBedtime(weekendSleep,weekendWake)}`;
 
-  // 本周最早记录
-  let now = new Date();
-  let dayOfWeek = now.getDay();
-  let weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
-  let weekData = data.filter(d=>new Date(d.time) >= weekStart);
+  // -------------------
+  // Week Records（基于当前筛选后的 data）
+  // -------------------
+  let sleepRecords = data.filter(d=>d.type==="sleep").sort((a,b)=>a.time-b.time);
+  let wakeRecords = data.filter(d=>d.type==="wake").sort((a,b)=>a.time-b.time);
 
-  let earliestSleep = weekData.filter(d=>d.type==="sleep").sort((a,b)=>a.time-b.time)[0]?.time;
-  let earliestWake = weekData.filter(d=>d.type==="wake").sort((a,b)=>a.time-b.time)[0]?.time;
+  // 计算跨天Bedtime
+  let bedtimes = [];
+  for(let i=0;i<Math.min(sleepRecords.length,wakeRecords.length);i++){
+    let start = new Date(sleepRecords[i].time);
+    let end = new Date(wakeRecords[i].time);
+    let diffMs = end - start;
+    if(diffMs < 0) diffMs += 24*60*60*1000; // 跨天
+    let hours = Math.floor(diffMs/3600000);
+    let minutes = Math.round((diffMs%3600000)/60000);
+    bedtimes.push({hours,minutes});
+  }
+
+  let earliestSleep = sleepRecords[0]?.time;
+  let earliestWake = wakeRecords[0]?.time;
+
+  let earliestSleepStr = earliestSleep ? formatDateWithWeekday(earliestSleep) : "-";
+  let earliestWakeStr = earliestWake ? formatDateWithWeekday(earliestWake) : "-";
 
   document.getElementById("weekRecords").innerHTML=
-    `<b>Week Records</b><br>Earliest Sleep:<br> ${earliestSleep?formatDateWithWeekday(earliestSleep):"-"}<br>Earliest Wake:<br> ${earliestWake?formatDateWithWeekday(earliestWake):"-"}`;
+    `<b>Week Records:</b><br>Earliest Sleep Record: ${earliestSleepStr}<br>Earliest Wake Record: ${earliestWakeStr}<br>Avg Bedtime: ${
+      bedtimes.length>0 ? fmtTime(
+        Math.round(bedtimes.reduce((sum,b)=>sum+b.hours*60+b.minutes,0)/bedtimes.length)
+      ) : "-"
+    }`;
 }
-
+  
 // 下拉框切换
 document.getElementById("monthSelect").addEventListener("change",render);
 
