@@ -71,10 +71,11 @@ select{
   font-size:40px;
 }
 
+/* 统计区域 */
 .stats-container{
   display:flex;
-  justify-content:space-between;
-  margin-bottom:20px;
+  gap:10px;
+  margin-bottom:60px;
 }
 
 .stats-col{
@@ -85,15 +86,11 @@ select{
   font-size:25px;
 }
 
-.week-records{
-  margin-top:10px;
-  font-size:25px;
-}
-
+/* Sleep/Wake/Bedtime 表格 */
 .columns{
   display:flex;
   gap:10px;
-  margin-bottom:60px;
+  margin-bottom:20px;
 }
 
 .col{
@@ -110,13 +107,20 @@ select{
 }
 
 .item{
-  font-size:35px;
+  font-size:30px; /* 调小点给Bedtime留空间 */
   padding:6px;
   border-bottom:1px solid #eee;
+  display:flex;
+  justify-content:space-between;
+}
+
+.item div{
+  flex:1;
+  text-align:center;
 }
 
 .compare{
-  font-size:30px;
+  font-size:25px;
 }
 
 .earlier{ color:green; }
@@ -127,14 +131,12 @@ select{
 }
 
 canvas{
-  max-height:700px; /* 图表高度调大 */
+  max-height:700px;
 }
-
 </style>
 </head>
 
 <body>
-
 <div class="container">
   <h1>Sleep Tracker</h1>
   <div class="time" id="time"></div>
@@ -145,13 +147,12 @@ canvas{
     <button id="exportBtn" class="export">Export Data</button>
   </div>
 
-  <!-- 新增统计区域 -->
-  <div class="stats-container" id="statsContainer">
+  <!-- 统计区域: Weekday / Weekend / Week Records -->
+  <div class="stats-container">
     <div class="stats-col" id="weekdayStats"></div>
     <div class="stats-col" id="weekendStats"></div>
+    <div class="stats-col" id="weekRecords"></div>
   </div>
-
-  <div class="week-records" id="weekRecords"></div>
 
   <select id="monthSelect"></select>
 
@@ -163,6 +164,10 @@ canvas{
     <div class="col">
       <h3>Wake</h3>
       <div id="wakeList"></div>
+    </div>
+    <div class="col">
+      <h3>Bedtime</h3>
+      <div id="bedtimeList"></div>
     </div>
   </div>
 
@@ -265,10 +270,19 @@ function render(){
   let wake=showData.filter(d=>d.type==="wake");
 
   document.getElementById("sleepList").innerHTML =
-    sleep.map((r,i)=>`<div class="item">${formatDateWithWeekday(r.time)} ${compare(r.time,sleep[i-1]?.time)}</div>`).join("");
+    sleep.map((r,i)=>`<div class="item"><div>${formatDateWithWeekday(r.time)} ${compare(r.time,sleep[i-1]?.time)}</div></div>`).join("");
 
   document.getElementById("wakeList").innerHTML =
-    wake.map((r,i)=>`<div class="item">${formatDateWithWeekday(r.time)} ${compare(r.time,wake[i-1]?.time)}</div>`).join("");
+    wake.map((r,i)=>`<div class="item"><div>${formatDateWithWeekday(r.time)} ${compare(r.time,wake[i-1]?.time)}</div></div>`).join("");
+
+  // 计算每条Bedtime
+  let bedtimes = [];
+  for(let i=0;i<Math.min(sleep.length,wake.length);i++){
+    let mins = (minutes(wake[i].time) - minutes(sleep[i].time) + 1440)%1440;
+    bedtimes.push(mins);
+  }
+  document.getElementById("bedtimeList").innerHTML =
+    bedtimes.map(m=>`<div class="item"><div>${Math.floor(m/60)}:${m%60<10?'0':''}${m%60}</div></div>`).join("");
 
   updateMonths();
   updateChart();
@@ -338,25 +352,11 @@ function updateChart(){
     },
     options:{
       plugins:{
-        legend:{
-          labels:{
-            font:{size:25} // 调大图例字体
-          }
-        }
+        legend:{ labels:{ font:{size:25} } }
       },
       scales:{
-        x:{
-          ticks:{ autoSkip:true, maxTicksLimit:10, font:{size:20} } // 调大x轴字体
-        },
-        y:{
-          min:0,
-          max:1440,
-          ticks:{
-            stepSize:240,
-            font:{size:20}, // 调大y轴字体
-            callback:v=>formatTimeFromMins(v)
-          }
-        }
+        x:{ ticks:{ autoSkip:true, maxTicksLimit:10, font:{size:20} } },
+        y:{ min:0, max:1440, ticks:{ stepSize:240, font:{size:20}, callback:v=>formatTimeFromMins(v) } }
       }
     }
   });
@@ -381,14 +381,8 @@ function updateStats(data){
     }
   });
 
-  function fmtTime(m){
-    if(!m && m!==0) return "-";
-    let h=Math.floor(m/60);
-    let mm=Math.round(m%60);
-    return h+":"+(mm<10?'0':'')+mm;
-  }
+  function fmtTime(m){ if(!m && m!==0) return "-"; let h=Math.floor(m/60); let mm=Math.round(m%60); return h+":"+(mm<10?'0':'')+mm; }
 
-  // 平均睡眠时长 = wake - sleep
   function avgBedtime(sleepArr,wakeArr){
     if(sleepArr.length===0 || wakeArr.length===0) return "-";
     let total=0,count=0;
@@ -421,7 +415,7 @@ function updateStats(data){
 // 下拉框切换
 document.getElementById("monthSelect").addEventListener("change",render);
 
-// 初始
+// 初始渲染
 render();
 </script>
 
