@@ -24,11 +24,11 @@ body {
 h1{
   text-align:center;
   margin-bottom:20px;
-  font-size:60px; /* 放大标题 */
+  font-size:60px;
 }
 
 .time{
-  font-size:40px; /* 放大时间 */
+  font-size:40px;
   margin-bottom:60px;
   color:#555;
   text-align:center;
@@ -45,7 +45,7 @@ button{
   padding:16px;
   border:none;
   border-radius:12px;
-  font-size:40px; /* 放大按钮文字 */
+  font-size:40px;
   cursor:pointer;
 }
 
@@ -60,7 +60,7 @@ button{
 }
 
 .export{
-  background:#facc15; /* 黄色底 */
+  background:#facc15;
   color:white;
 }
 
@@ -68,7 +68,26 @@ select{
   margin:12px 0;
   width:100%;
   padding:12px;
-  font-size:40px; /* 放大下拉文字 */
+  font-size:40px;
+}
+
+.stats-container{
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:20px;
+}
+
+.stats-col{
+  flex:1;
+  background:#f9fafb;
+  padding:12px;
+  border-radius:10px;
+  font-size:25px;
+}
+
+.week-records{
+  margin-top:10px;
+  font-size:25px;
 }
 
 .columns{
@@ -86,18 +105,18 @@ select{
 }
 
 .col h3{
-  font-size:45px; /* 放大列标题 */
+  font-size:45px;
   margin-bottom:40px;
 }
 
 .item{
-  font-size:35px; /* 放大列表文字 */
+  font-size:35px;
   padding:6px;
   border-bottom:1px solid #eee;
 }
 
 .compare{
-  font-size:30px; /* 放大对比文字 */
+  font-size:30px;
 }
 
 .earlier{ color:green; }
@@ -108,16 +127,9 @@ select{
 }
 
 canvas{
-  max-height:600px; /* 缩小图表高度 */
+  max-height:700px; /* 图表高度调大 */
 }
 
-.stats{
-  margin-top:40px;
-  font-size:25px; /* 放大统计文字 */
-  background:#f9fafb;
-  padding:12px;
-  border-radius:10px;
-}
 </style>
 </head>
 
@@ -132,6 +144,14 @@ canvas{
     <button id="deleteBtn" class="delete">Delete Latest</button>
     <button id="exportBtn" class="export">Export Data</button>
   </div>
+
+  <!-- 新增统计区域 -->
+  <div class="stats-container" id="statsContainer">
+    <div class="stats-col" id="weekdayStats"></div>
+    <div class="stats-col" id="weekendStats"></div>
+  </div>
+
+  <div class="week-records" id="weekRecords"></div>
 
   <select id="monthSelect"></select>
 
@@ -149,8 +169,6 @@ canvas{
   <div class="chartbox">
     <canvas id="chart"></canvas>
   </div>
-
-  <div class="stats" id="stats"></div>
 </div>
 
 <script>
@@ -167,7 +185,6 @@ function saveData(data){ localStorage.setItem("sleepData",JSON.stringify(data));
 
 // -------------------
 // Record（自动判断类型）
-// -------------------
 document.getElementById("recordBtn").addEventListener("click",()=>{
   let now = new Date();
   let hour = now.getHours();
@@ -182,7 +199,6 @@ document.getElementById("recordBtn").addEventListener("click",()=>{
 
 // -------------------
 // 删除最近一条
-// -------------------
 document.getElementById("deleteBtn").addEventListener("click",()=>{
   let data=getData();
   if(data.length>0){
@@ -195,7 +211,6 @@ document.getElementById("deleteBtn").addEventListener("click",()=>{
 
 // -------------------
 // 导出数据
-// -------------------
 document.getElementById("exportBtn").addEventListener("click",()=>{
   let data=getData();
   let blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -211,7 +226,6 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
 
 // -------------------
 // 工具函数
-// -------------------
 function minutes(t){ let d = new Date(t); return d.getHours()*60 + d.getMinutes(); }
 
 function compare(current,prev){
@@ -240,7 +254,6 @@ function getMonthStr(t){
 
 // -------------------
 // 渲染
-// -------------------
 function render(){
   let data=getData();
 
@@ -259,11 +272,11 @@ function render(){
 
   updateMonths();
   updateChart();
+  updateStats(showData);
 }
 
 // -------------------
 // 月份
-// -------------------
 function updateMonths(){
   let data=getData();
   let months=[...new Set(data.map(d=>getMonthStr(d.time)))];
@@ -278,7 +291,6 @@ function updateMonths(){
 
 // -------------------
 // 图表
-// -------------------
 let chart;
 
 function minutesForChart(t){
@@ -325,29 +337,36 @@ function updateChart(){
       ]
     },
     options:{
+      plugins:{
+        legend:{
+          labels:{
+            font:{size:25} // 调大图例字体
+          }
+        }
+      },
       scales:{
-        x:{ ticks:{ autoSkip:true, maxTicksLimit:10 } },
+        x:{
+          ticks:{ autoSkip:true, maxTicksLimit:10, font:{size:20} } // 调大x轴字体
+        },
         y:{
           min:0,
           max:1440,
           ticks:{
             stepSize:240,
+            font:{size:20}, // 调大y轴字体
             callback:v=>formatTimeFromMins(v)
           }
         }
       }
     }
   });
-
-  calcStats(showData);
 }
 
 // -------------------
-// 统计
-// -------------------
+// 统计计算
 function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
 
-function calcStats(data){
+function updateStats(data){
   let weekdaySleep=[], weekdayWake=[], weekendSleep=[], weekendWake=[];
 
   data.forEach(d=>{
@@ -362,19 +381,44 @@ function calcStats(data){
     }
   });
 
-  function fmt(m){
+  function fmtTime(m){
     if(!m && m!==0) return "-";
     let h=Math.floor(m/60);
     let mm=Math.round(m%60);
     return h+":"+(mm<10?'0':'')+mm;
   }
 
-  document.getElementById("stats").innerHTML=
-  `<b>Weekday Avg</b><br>Sleep: ${fmt(avg(weekdaySleep))}<br>Wake: ${fmt(avg(weekdayWake))}<br><br>
-   <b>Weekend Avg</b><br>Sleep: ${fmt(avg(weekendSleep))}<br>Wake: ${fmt(avg(weekendWake))}`;
+  // 平均睡眠时长 = wake - sleep
+  function avgBedtime(sleepArr,wakeArr){
+    if(sleepArr.length===0 || wakeArr.length===0) return "-";
+    let total=0,count=0;
+    for(let i=0;i<Math.min(sleepArr.length,wakeArr.length);i++){
+      total += (wakeArr[i]-sleepArr[i]+1440)%1440;
+      count++;
+    }
+    return fmtTime(total/count);
+  }
+
+  document.getElementById("weekdayStats").innerHTML=
+    `<b>Weekday Avg</b><br>Sleep: ${fmtTime(avg(weekdaySleep))}<br>Wake: ${fmtTime(avg(weekdayWake))}<br>Bedtime: ${avgBedtime(weekdaySleep,weekdayWake)}`;
+
+  document.getElementById("weekendStats").innerHTML=
+    `<b>Weekend Avg</b><br>Sleep: ${fmtTime(avg(weekendSleep))}<br>Wake: ${fmtTime(avg(weekendWake))}<br>Bedtime: ${avgBedtime(weekendSleep,weekendWake)}`;
+
+  // 本周最早记录
+  let now = new Date();
+  let dayOfWeek = now.getDay();
+  let weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+  let weekData = data.filter(d=>new Date(d.time) >= weekStart);
+
+  let earliestSleep = weekData.filter(d=>d.type==="sleep").sort((a,b)=>a.time-b.time)[0]?.time;
+  let earliestWake = weekData.filter(d=>d.type==="wake").sort((a,b)=>a.time-b.time)[0]?.time;
+
+  document.getElementById("weekRecords").innerHTML=
+    `<b>Week Records:</b><br>Earliest Sleep Record: ${earliestSleep?formatDateWithWeekday(earliestSleep):"-"}<br>Earliest Wake Record: ${earliestWake?formatDateWithWeekday(earliestWake):"-"}`;
 }
 
-// 切换月份
+// 下拉框切换
 document.getElementById("monthSelect").addEventListener("change",render);
 
 // 初始
