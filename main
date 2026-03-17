@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sleep Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont;
+  background:#f2f2f7;
+  margin:0;
+  padding:20px;
+  text-align:center;
+}
+.container{
+  max-width:420px;
+  margin:auto;
+  background:white;
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 8px 25px rgba(0,0,0,0.08);
+}
+h1{
+  text-align:center;
+  margin-bottom:10px;
+}
+.time{
+  font-size:18px;
+  margin-bottom:15px;
+  color:#555;
+  text-align:center;
+}
+.controls{
+  display:flex;
+  gap:10px;
+  margin-bottom:15px;
+  justify-content:center;
+}
+button{
+  flex:1;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  font-size:14px;
+  cursor:pointer;
+}
+.sleep{
+  background:#10b981; /* 绿色 */
+  color:white;
+}
+.wake{
+  background:#f59e0b;
+  color:white;
+}
+.delete{
+  background:#ef4444;
+  color:white;
+}
+select{
+  margin:10px 0;
+  width:100%;
+  padding:6px;
+}
+.columns{
+  display:flex;
+  gap:10px;
+  margin-bottom:20px;
+}
+.col{
+  flex:1;
+  background:#fafafa;
+  padding:10px;
+  border-radius:10px;
+  text-align:center;
+}
+.col h3{
+  margin-bottom:10px;
+}
+.item{
+  font-size:13px;
+  padding:6px;
+  border-bottom:1px solid #eee;
+}
+.compare{
+  font-size:11px;
+}
+.earlier{
+  color:green;
+}
+.later{
+  color:red;
+}
+.chartbox{
+  margin-top:25px;
+}
+.stats{
+  margin-top:15px;
+  font-size:13px;
+  background:#f9fafb;
+  padding:10px;
+  border-radius:10px;
+  text-align:left;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Sleep Tracker</h1>
+  <div class="time" id="time"></div>
+
+  <div class="controls">
+    <button id="sleepBtn" class="sleep">Record Sleep</button>
+    <button id="wakeBtn" class="wake">Record Wake</button>
+    <button id="deleteBtn" class="delete">Delete Mode</button>
+  </div>
+
+  <!-- 下拉框放到记录按钮下、列表上方 -->
+  <select id="monthSelect"></select>
+
+  <div class="columns">
+    <div class="col">
+      <h3>Sleep</h3>
+      <div id="sleepList"></div>
+    </div>
+    <div class="col">
+      <h3>Wake</h3>
+      <div id="wakeList"></div>
+    </div>
+  </div>
+
+  <div class="chartbox">
+    <canvas id="chart" height="200"></canvas>
+  </div>
+
+  <div class="stats" id="stats"></div>
+</div>
+
+<script>
+// -------------------
+// 初始化时间显示
+// -------------------
+function updateClock() {
+  document.getElementById("time").innerText = new Date().toLocaleString();
+}
+setInterval(updateClock,1000);
+updateClock();
+
+// -------------------
+// 变量
+// -------------------
+let deleteMode=false;
+
+// -------------------
+// 按钮事件
+// -------------------
+document.getElementById("deleteBtn").addEventListener("click",()=>{ deleteMode=!deleteMode; alert(deleteMode ? "Delete mode ON":"Delete mode OFF"); });
+document.getElementById("sleepBtn").addEventListener("click",()=>record("sleep"));
+document.getElementById("wakeBtn").addEventListener("click",()=>record("wake"));
+
+// -------------------
+// localStorage 操作
+// -------------------
+function getData(){ return JSON.parse(localStorage.getItem("sleepData")||"[]"); }
+function saveData(data){ localStorage.setItem("sleepData",JSON.stringify(data)); }
+
+// -------------------
+// 记录函数
+// -------------------
+function record(type){
+  let data=getData();
+  if(deleteMode){
+    for(let i=data.length-1;i>=0;i--){
+      if(data[i].type===type){ data.splice(i,1); break; }
+    }
+    saveData(data);
+    render();
+    return;
+  }
+  data.push({type,time:Date.now()});
+  saveData(data);
+  render();
+}
+
+// -------------------
+// 对比显示
+// -------------------
+function minutes(t){ let d = new Date(t); return d.getHours()*60 + d.getMinutes(); }
+function compare(current,prev){
+  if(!prev) return "";
+  let diff = minutes(current) - minutes(prev);
+  let m = Math.abs(diff);
+  if(diff<0) return `<div class="compare earlier">↑ ${m} min earlier</div>`;
+  else return `<div class="compare later">↓ ${m} min later</div>`;
+}
+
+// -------------------
+// 日期显示带星期 (两位年份 + 时间 hh:mm)
+// -------------------
+function formatDateWithWeekday(t){
+  const d = new Date(t);
+  const weekDays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const yy = d.getFullYear()%100;
+  const mm = d.getMonth()+1;
+  const dd = d.getDate();
+  const hh = d.getHours();
+  const min = d.getMinutes();
+  return `${yy}-${mm}-${dd} ${weekDays[d.getDay()]} ${hh}:${min<10?'0':''}${min}`;
+}
+
+// -------------------
+// 获取月份字符串 2025-M1
+// -------------------
+function getMonthStr(t){
+  const d = new Date(t);
+  return d.getFullYear()+"-M"+(d.getMonth()+1);
+}
+
+// -------------------
+// 渲染列表
+// -------------------
+function render(){
+  let data=getData();
+
+  // 获取下拉选月
+  let monthSel=document.getElementById("monthSelect");
+  let selValue=monthSel.value;
+  let showData = (selValue && selValue!=="ALL") ? data.filter(d=>getMonthStr(d.time)===selValue) : data;
+
+  let sleep=showData.filter(d=>d.type==="sleep");
+  let wake=showData.filter(d=>d.type==="wake");
+
+  document.getElementById("sleepList").innerHTML = sleep.map((r,i)=>`<div class="item">${formatDateWithWeekday(r.time)} ${compare(r.time,sleep[i-1]?.time)}</div>`).join("");
+  document.getElementById("wakeList").innerHTML = wake.map((r,i)=>`<div class="item">${formatDateWithWeekday(r.time)} ${compare(r.time,wake[i-1]?.time)}</div>`).join("");
+
+  updateMonths();
+  updateChart();
+}
+
+// -------------------
+// 更新下拉框月份选项
+// -------------------
+function updateMonths(){
+  let data=getData();
+  let months=[...new Set(data.map(d=>getMonthStr(d.time)))];
+  let select=document.getElementById("monthSelect");
+  let curVal=select.value;
+  select.innerHTML="<option>ALL</option>";
+  months.forEach(m=>select.innerHTML+=`<option>${m}</option>`);
+  if(curVal) select.value=curVal; else select.value="ALL";
+}
+
+// -------------------
+// Chart.js 绘制
+// -------------------
+let chart;
+function minutesForChart(t){
+  const d = new Date(t);
+  const totalMins = d.getHours()*60 + d.getMinutes();
+  return (totalMins - 240 + 1440) % 1440;
+}
+function formatTimeFromMins(m){
+  let total = (m + 240) % 1440;
+  let h=Math.floor(total/60);
+  let min=total%60;
+  return h+":"+(min<10?'0':'')+min;
+}
+function formatDateForChart(t){
+  const d = new Date(t);
+  return `${d.getFullYear()%100}-${d.getMonth()+1}-${d.getDate()}`;
+}
+
+function updateChart(){
+  let data=getData();
+  let month=document.getElementById("monthSelect").value;
+  let showData = (month && month!=="ALL") ? data.filter(d=>getMonthStr(d.time)===month) : data;
+
+  let sleep=showData.filter(d=>d.type==="sleep");
+  let wake=showData.filter(d=>d.type==="wake");
+
+  let labels = sleep.map(s=>formatDateForChart(s.time));
+  let sleepY = sleep.map(s=>minutesForChart(s.time));
+  let wakeY = wake.map(w=>minutesForChart(w.time));
+
+  if(chart) chart.destroy();
+  let ctx=document.getElementById("chart").getContext("2d");
+  chart=new Chart(ctx,{
+    type:"line",
+    data:{
+      labels:labels,
+      datasets:[
+        {label:"Sleep", data:sleepY, borderColor:"#10b981", fill:false},
+        {label:"Wake", data:wakeY, borderColor:"#f59e0b", fill:false}
+      ]
+    },
+    options:{
+      scales:{
+        x:{
+          ticks:{
+            autoSkip:true,
+            maxTicksLimit:10 // 控制横轴显示数量
+          }
+        },
+        y:{
+          min:0,
+          max:1440,
+          ticks:{
+            stepSize:240, // 每4小时
+            callback:v=>formatTimeFromMins(v)
+          }
+        }
+      }
+    }
+  });
+
+  calcStats(showData);
+}
+
+// -------------------
+// 周统计计算
+// -------------------
+function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+function calcStats(data){
+  let weekdaySleep=[], weekdayWake=[], weekendSleep=[], weekendWake=[];
+
+  data.forEach(d=>{
+    let day=new Date(d.time).getDay();
+    let m=minutes(d.time);
+    if(day===0||day===6){ if(d.type==="sleep") weekendSleep.push(m); if(d.type==="wake") weekendWake.push(m);}
+    else{ if(d.type==="sleep") weekdaySleep.push(m); if(d.type==="wake") weekdayWake.push(m);}
+  });
+
+  function fmt(m){ if(!m && m!==0) return "-"; let h=Math.floor(m/60); let mm=Math.round(m%60); return h+":"+(mm<10?'0':'')+mm; }
+
+  document.getElementById("stats").innerHTML=
+  `<b>Weekday Avg</b><br>Sleep: ${fmt(avg(weekdaySleep))}<br>Wake: ${fmt(avg(weekdayWake))}<br><br>
+   <b>Weekend Avg</b><br>Sleep: ${fmt(avg(weekendSleep))}<br>Wake: ${fmt(avg(weekendWake))}`;
+}
+
+// 下拉框切换事件
+document.getElementById("monthSelect").addEventListener("change",render);
+
+// 初始渲染
+render();
+</script>
+</body>
+</html>
