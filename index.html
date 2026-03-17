@@ -10,35 +10,24 @@
 
 <style>
 body{
-  font-family:-apple-system, BlinkMacSystemFont;
-  background:white;
+  font-family:-apple-system;
   margin:0;
-  padding:0;
+  background:white;
 }
 
 .container{
   width:100%;
   min-height:100vh;
-  box-sizing:border-box;
   padding:20px;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-h1{
-  text-align:center;
-}
-
-.time{
-  text-align:center;
-  color:#666;
-  margin-bottom:10px;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+  box-sizing:border-box;
 }
 
 .controls{
   display:flex;
   gap:10px;
-  margin-bottom:15px;
+  margin-bottom:10px;
 }
 
 button{
@@ -46,19 +35,12 @@ button{
   padding:14px;
   border:none;
   border-radius:12px;
-  font-size:15px;
   color:white;
 }
 
-.record{ background:#10b981; }
-.delete{ background:#ef4444; }
-.export{ background:#3b82f6; }
-
-select{
-  width:100%;
-  margin-bottom:15px;
-  padding:8px;
-}
+.record{background:#10b981;}
+.delete{background:#ef4444;}
+.export{background:#facc15;color:black;}
 
 .columns{
   display:flex;
@@ -75,17 +57,14 @@ select{
 .item{
   font-size:13px;
   border-bottom:1px solid #ddd;
-  padding:5px;
+  padding:6px;
 }
 
-.chartbox{
-  margin-top:20px;
-}
+.compare{font-size:11px;}
+.earlier{color:green;}
+.later{color:red;}
 
-.stats{
-  margin-top:15px;
-  font-size:13px;
-}
+.stats{margin-top:15px;font-size:13px;}
 </style>
 </head>
 
@@ -93,13 +72,13 @@ select{
 
 <div class="container">
 
-<h1>Sleep Tracker</h1>
-<div class="time" id="time"></div>
+<h2>Sleep Tracker</h2>
+<div id="time"></div>
 
 <div class="controls">
-  <button class="record" id="recordBtn">Record</button>
-  <button class="delete" id="deleteBtn">Delete Latest</button>
-  <button class="export" id="exportBtn">Export</button>
+  <button class="record" onclick="record()">Record</button>
+  <button class="delete" onclick="deleteLatest()">Delete Latest</button>
+  <button class="export" onclick="exportData()">Export</button>
 </div>
 
 <select id="monthSelect"></select>
@@ -115,9 +94,7 @@ select{
   </div>
 </div>
 
-<div class="chartbox">
-  <canvas id="chart"></canvas>
-</div>
+<canvas id="chart"></canvas>
 
 <div class="stats" id="stats"></div>
 
@@ -125,153 +102,113 @@ select{
 
 <script>
 
-// 时间显示
-function updateClock(){
-  document.getElementById("time").innerText=new Date().toLocaleString();
-}
-setInterval(updateClock,1000);
-updateClock();
+// 时间
+setInterval(()=>document.getElementById("time").innerText=new Date().toLocaleString(),1000);
 
 // 数据
-function getData(){ return JSON.parse(localStorage.getItem("sleepData")||"[]"); }
-function saveData(d){ localStorage.setItem("sleepData",JSON.stringify(d)); }
+function getData(){return JSON.parse(localStorage.getItem("sleepData")||"[]");}
+function saveData(d){localStorage.setItem("sleepData",JSON.stringify(d));}
 
-// 智能记录
+// 记录
 function record(){
-  let now=new Date();
-  let hour=now.getHours();
-
-  let type;
-
-  if(hour>=18 || hour<6){
-    type="sleep";
-  }else{
-    type="wake";
-  }
-
-  let data=getData();
-  data.push({type,time:Date.now()});
-  saveData(data);
+  let h=new Date().getHours();
+  let type=(h>=18||h<6)?"sleep":"wake";
+  let d=getData();
+  d.push({type,time:Date.now()});
+  saveData(d);
   render();
 }
 
-// 删除最新
+// 删除
 function deleteLatest(){
-  let data=getData();
-  data.pop();
-  saveData(data);
+  let d=getData();
+  d.pop();
+  saveData(d);
   render();
 }
 
 // 导出
 function exportData(){
-  let data=localStorage.getItem("sleepData")||"[]";
-  let blob=new Blob([data],{type:"application/json"});
-  let url=URL.createObjectURL(blob);
-
+  let blob=new Blob([localStorage.getItem("sleepData")||"[]"]);
   let a=document.createElement("a");
-  a.href=url;
+  a.href=URL.createObjectURL(blob);
   a.download="sleepData.json";
   a.click();
 }
 
-// 绑定按钮
-document.getElementById("recordBtn").onclick=record;
-document.getElementById("deleteBtn").onclick=deleteLatest;
-document.getElementById("exportBtn").onclick=exportData;
+// 工具
+function minutes(t){let d=new Date(t);return d.getHours()*60+d.getMinutes();}
+function fmtTime(m){let h=Math.floor(m/60);let mm=m%60;return h+":"+mm.toString().padStart(2,'0');}
 
-// 工具函数
-function minutes(t){
-  let d=new Date(t);
-  return d.getHours()*60+d.getMinutes();
+// 同比
+function compare(cur,prev){
+  if(!prev) return "";
+  let diff=minutes(cur)-minutes(prev);
+  let m=Math.abs(diff);
+  return diff<0?
+    `<div class="compare earlier">↑ ${m} min earlier</div>`:
+    `<div class="compare later">↓ ${m} min later</div>`;
 }
 
-function format(t){
-  let d=new Date(t);
-  return `${d.getFullYear()%100}-${d.getMonth()+1}-${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-}
+// 睡眠时长计算
+function calcDurations(data){
+  let pairs=[];
+  let lastSleep=null;
 
-function getMonthStr(t){
-  let d=new Date(t);
-  return d.getFullYear()+"-"+(d.getMonth()+1);
+  data.forEach(d=>{
+    if(d.type==="sleep") lastSleep=d;
+    if(d.type==="wake" && lastSleep){
+      pairs.push({sleep:lastSleep.time,wake:d.time});
+      lastSleep=null;
+    }
+  });
+  return pairs;
 }
 
 // 渲染
 function render(){
   let data=getData();
 
-  let month=document.getElementById("monthSelect").value;
-  let show=month && month!=="ALL" ? data.filter(d=>getMonthStr(d.time)===month):data;
+  let sleep=data.filter(d=>d.type==="sleep");
+  let wake=data.filter(d=>d.type==="wake");
 
-  let sleep=show.filter(d=>d.type==="sleep");
-  let wake=show.filter(d=>d.type==="wake");
+  let pairs=calcDurations(data);
 
-  document.getElementById("sleepList").innerHTML=sleep.map(d=>`<div class="item">${format(d.time)}</div>`).join("");
-  document.getElementById("wakeList").innerHTML=wake.map(d=>`<div class="item">${format(d.time)}</div>`).join("");
+  document.getElementById("sleepList").innerHTML=sleep.map((d,i)=>{
+    let dur="";
+    let p=pairs.find(p=>p.sleep===d.time);
+    if(p){
+      let m=Math.floor((p.wake-p.sleep)/60000);
+      dur=`<div>${Math.floor(m/60)}h ${m%60}m</div>`;
+    }
+    return `<div class="item">${new Date(d.time).toLocaleString()}${compare(d.time,sleep[i-1]?.time)}${dur}</div>`;
+  }).join("");
 
-  updateMonths();
-  updateChart(show);
-}
+  document.getElementById("wakeList").innerHTML=wake.map((d,i)=>
+    `<div class="item">${new Date(d.time).toLocaleString()}${compare(d.time,wake[i-1]?.time)}</div>`
+  ).join("");
 
-// 月份
-function updateMonths(){
-  let data=getData();
-  let months=[...new Set(data.map(d=>getMonthStr(d.time)))];
-
-  let sel=document.getElementById("monthSelect");
-  let cur=sel.value;
-
-  sel.innerHTML="<option>ALL</option>";
-  months.forEach(m=>sel.innerHTML+=`<option>${m}</option>`);
-
-  sel.value=cur||"ALL";
+  updateChart(data);
 }
 
 // 图表
 let chart;
-function minutesForChart(t){
-  let d=new Date(t);
-  return (d.getHours()*60+d.getMinutes()-240+1440)%1440;
-}
-
-function formatTime(m){
-  let t=(m+240)%1440;
-  let h=Math.floor(t/60);
-  let min=t%60;
-  return h+":"+min.toString().padStart(2,'0');
-}
+function minutesForChart(t){return (minutes(t)-240+1440)%1440;}
 
 function updateChart(data){
-
   let sleep=data.filter(d=>d.type==="sleep");
   let wake=data.filter(d=>d.type==="wake");
-
-  let labels=sleep.map(d=>format(d.time));
-  let sleepY=sleep.map(d=>minutesForChart(d.time));
-  let wakeY=wake.map(d=>minutesForChart(d.time));
 
   if(chart) chart.destroy();
 
   chart=new Chart(document.getElementById("chart"),{
     type:"line",
     data:{
-      labels:labels,
+      labels:sleep.map(d=>new Date(d.time).toLocaleDateString()),
       datasets:[
-        {label:"Sleep",data:sleepY,borderColor:"#10b981"},
-        {label:"Wake",data:wakeY,borderColor:"#f59e0b"}
+        {label:"Sleep",data:sleep.map(d=>minutesForChart(d.time))},
+        {label:"Wake",data:wake.map(d=>minutesForChart(d.time))}
       ]
-    },
-    options:{
-      scales:{
-        y:{
-          min:0,
-          max:1440,
-          ticks:{
-            stepSize:240,
-            callback:v=>formatTime(v)
-          }
-        }
-      }
     }
   });
 
@@ -279,34 +216,28 @@ function updateChart(data){
 }
 
 // 统计
-function avg(arr){
-  return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
-}
-
 function calcStats(data){
-  let s=[],w=[];
+  let s=data.filter(d=>d.type==="sleep").map(d=>minutes(d.time));
+  let w=data.filter(d=>d.type==="wake").map(d=>minutes(d.time));
+  let pairs=calcDurations(data);
 
-  data.forEach(d=>{
-    if(d.type==="sleep") s.push(minutes(d.time));
-    if(d.type==="wake") w.push(minutes(d.time));
-  });
+  let durations=pairs.map(p=>(p.wake-p.sleep)/60000);
 
-  function fmt(m){
-    if(!m && m!==0) return "-";
-    let h=Math.floor(m/60);
-    let mm=Math.round(m%60);
-    return h+":"+mm.toString().padStart(2,'0');
-  }
+  function avg(a){return a.length?a.reduce((x,y)=>x+y)/a.length:null;}
+
+  let avgDur=avg(durations);
 
   document.getElementById("stats").innerHTML=
-    `Avg Sleep: ${fmt(avg(s))}<br>Avg Wake: ${fmt(avg(w))}`;
+  `Avg Sleep: ${fmtTime(avg(s))}<br>
+   Avg Wake: ${fmtTime(avg(w))}<br>
+   Avg Duration: ${avgDur?Math.floor(avgDur/60)+"h "+Math.round(avgDur%60)+"m":"-"}<br>
+   Earliest Sleep: ${fmtTime(Math.min(...s))}<br>
+   Earliest Wake: ${fmtTime(Math.min(...w))}`;
 }
-
-// 切换月份
-document.getElementById("monthSelect").onchange=render;
 
 render();
 
 </script>
+
 </body>
 </html>
