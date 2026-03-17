@@ -409,7 +409,7 @@ function updateStats(data){
   let earliestWake = weekData.filter(d=>d.type==="wake").sort((a,b)=>a.time-b.time)[0]?.time;
 
   document.getElementById("weekRecords").innerHTML=
-    `<b>Week Records</b><br>Earliest Sleep: ${earliestSleep?formatDateWithWeekday(earliestSleep):"-"}<br>Earliest Wake: ${earliestWake?formatDateWithWeekday(earliestWake):"-"}`;
+    `<b>Week Records</b><br>Earliest Sleep:<br> ${earliestSleep?formatDateWithWeekday(earliestSleep):"-"}<br>Earliest Wake:<br> ${earliestWake?formatDateWithWeekday(earliestWake):"-"}`;
 }
 
 // 下拉框切换
@@ -421,3 +421,54 @@ render();
 
 </body>
 </html>
+
+
+<script>
+// -------------------
+// 测试数据生成与清空功能
+// -------------------
+
+// 1. 清空当前所有数据
+function clearAllData(){
+  localStorage.removeItem("sleepData");
+  alert("All sleep/wake records have been deleted.");
+  render();
+}
+
+// 2. 随机生成 2025年12月 & 2026年1月 Sleep/Wake 数据
+function generateRandomTestData(){
+  const months = [
+    {year:2025, month:12},
+    {year:2026, month:1}
+  ];
+  let testData = [];
+
+  months.forEach(({year,month})=>{
+    // 随机生成 20 天数据
+    for(let day=1; day<=20; day++){
+      // 随机晚间睡眠 21:00~0:30
+      let sleepHour = 21 + Math.floor(Math.random()*4);
+      let sleepMin = Math.floor(Math.random()*60);
+      let sleepDate = new Date(year, month-1, day, sleepHour%24, sleepMin);
+
+      // 随机起床 6:00~9:00 第二天
+      let wakeHour = 6 + Math.floor(Math.random()*4);
+      let wakeMin = Math.floor(Math.random()*60);
+      let wakeDate = new Date(year, month-1, day, wakeHour, wakeMin);
+      if(wakeDate <= sleepDate) wakeDate.setDate(wakeDate.getDate()+1);
+
+      testData.push({type:"sleep", time:sleepDate.getTime()});
+      testData.push({type:"wake", time:wakeDate.getTime()});
+    }
+  });
+
+  // 保存到 localStorage
+  localStorage.setItem("sleepData", JSON.stringify(testData));
+  alert("Random Sleep/Wake data for Dec 2025 & Jan 2026 has been generated.");
+  render();
+}
+
+// 供手动调用
+window.clearAllData = clearAllData;
+window.generateRandomTestData = generateRandomTestData;
+</script>
