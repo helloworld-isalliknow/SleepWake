@@ -259,10 +259,6 @@ function getMonthStr(t){
 
 // -------------------
 // 渲染
-<!-- 之前代码保持不变，这里只替换 render() 中 Bedtime 逻辑部分 -->
-<script>
-// ... 上文代码不变 ...
-
 function render(){
   let data=getData();
 
@@ -279,27 +275,19 @@ function render(){
   document.getElementById("wakeList").innerHTML =
     wake.map((r,i)=>`<div class="item"><div>${formatDateWithWeekday(r.time)} ${compare(r.time,wake[i-1]?.time)}</div></div>`).join("");
 
-  // -------------------
-  // Bedtime 优化（支持跨天）
-  // -------------------
+  // 计算每条Bedtime
   let bedtimes = [];
   for(let i=0;i<Math.min(sleep.length,wake.length);i++){
-    let start = new Date(sleep[i].time);
-    let end = new Date(wake[i].time);
-    let diffMs = end - start;
-    if(diffMs < 0) diffMs += 24*60*60*1000; // 跨天
-    let hours = Math.floor(diffMs/3600000);
-    let minutes = Math.round((diffMs%3600000)/60000);
-    bedtimes.push({hours,minutes});
+    let mins = (minutes(wake[i].time) - minutes(sleep[i].time) + 1440)%1440;
+    bedtimes.push(mins);
   }
   document.getElementById("bedtimeList").innerHTML =
-    bedtimes.map(b=>`<div class="item"><div>${b.hours}:${b.minutes<10?'0':''}${b.minutes}</div></div>`).join("");
+    bedtimes.map(m=>`<div class="item"><div>${Math.floor(m/60)}:${m%60<10?'0':''}${m%60}</div></div>`).join("");
 
   updateMonths();
   updateChart();
   updateStats(showData);
 }
-</script>
 
 // -------------------
 // 月份
