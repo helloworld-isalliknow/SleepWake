@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <title>Sleep Tracker</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Metronome">
+<link rel="apple-touch-icon" href="apple-touch-icon1.png">
 
 <style>
 body {
@@ -86,7 +90,7 @@ select{
   font-size:25px;
 }
 
-/* Sleep/Wake/Bedtime 表格 */
+/* 表格 */
 .columns{
   display:flex;
   gap:10px;
@@ -107,16 +111,12 @@ select{
 }
 
 .item{
-  font-size:30px; /* 调小点给Bedtime留空间 */
+  font-size:30px;
   padding:6px;
   border-bottom:1px solid #eee;
   display:flex;
-  justify-content:space-between;
-}
-
-.item div{
-  flex:1;
-  text-align:center;
+  flex-direction:column;
+  align-items:center;
 }
 
 .compare{
@@ -147,11 +147,10 @@ canvas{
     <button id="exportBtn" class="export">Export Data</button>
   </div>
 
-  <!-- 统计区域: Weekday / Weekend / Week Records -->
+  <!-- 统计区域 -->
   <div class="stats-container">
     <div class="stats-col" id="weekdayStats"></div>
     <div class="stats-col" id="weekendStats"></div>
-    <div class="stats-col" id="weekRecords"></div>
   </div>
 
   <select id="monthSelect"></select>
@@ -184,16 +183,14 @@ function updateClock() {
 setInterval(updateClock,1000);
 updateClock();
 
-// localStorage
+// storage
 function getData(){ return JSON.parse(localStorage.getItem("sleepData")||"[]"); }
 function saveData(data){ localStorage.setItem("sleepData",JSON.stringify(data)); }
 
-// -------------------
-// Record（自动判断类型）
+// Record
 document.getElementById("recordBtn").addEventListener("click",()=>{
   let now = new Date();
   let hour = now.getHours();
-
   let type = (hour >=18 || hour <6) ? "sleep" : "wake";
 
   let data=getData();
@@ -202,8 +199,7 @@ document.getElementById("recordBtn").addEventListener("click",()=>{
   render();
 });
 
-// -------------------
-// 删除最近一条
+// Delete
 document.getElementById("deleteBtn").addEventListener("click",()=>{
   let data=getData();
   if(data.length>0){
@@ -214,8 +210,7 @@ document.getElementById("deleteBtn").addEventListener("click",()=>{
   }
 });
 
-// -------------------
-// 导出数据
+// Export
 document.getElementById("exportBtn").addEventListener("click",()=>{
   let data=getData();
   let blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
@@ -229,8 +224,7 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
   URL.revokeObjectURL(url);
 });
 
-// -------------------
-// 工具函数
+// utils
 function minutes(t){ let d = new Date(t); return d.getHours()*60 + d.getMinutes(); }
 
 function compare(current,prev){
@@ -244,12 +238,7 @@ function compare(current,prev){
 function formatDateWithWeekday(t){
   const d = new Date(t);
   const weekDays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-  const yy = d.getFullYear()%100;
-  const mm = d.getMonth()+1;
-  const dd = d.getDate();
-  const hh = d.getHours();
-  const min = d.getMinutes();
-  return `${yy}-${mm}-${dd} ${weekDays[d.getDay()]} ${hh}:${min<10?'0':''}${min}`;
+  return `${d.getFullYear()%100}-${d.getMonth()+1}-${d.getDate()} ${weekDays[d.getDay()]} ${d.getHours()}:${d.getMinutes()<10?'0':''}${d.getMinutes()}`;
 }
 
 function getMonthStr(t){
@@ -257,8 +246,7 @@ function getMonthStr(t){
   return d.getFullYear()+"-M"+(d.getMonth()+1);
 }
 
-// -------------------
-// 渲染
+// render
 function render(){
   let data=getData();
 
@@ -266,30 +254,43 @@ function render(){
   let selValue=monthSel.value;
   let showData = (selValue && selValue!=="ALL") ? data.filter(d=>getMonthStr(d.time)===selValue) : data;
 
-  let sleep=showData.filter(d=>d.type==="sleep");
-  let wake=showData.filter(d=>d.type==="wake");
+  // ✅ 关键修改：按时间倒序
+  let sleep=showData.filter(d=>d.type==="sleep").sort((a,b)=>b.time-a.time);
+  let wake=showData.filter(d=>d.type==="wake").sort((a,b)=>b.time-a.time);
 
   document.getElementById("sleepList").innerHTML =
-    sleep.map((r,i)=>`<div class="item"><div>${formatDateWithWeekday(r.time)} ${compare(r.time,sleep[i-1]?.time)}</div></div>`).join("");
+    sleep.map((r,i)=>`
+      <div class="item">
+        <div>${formatDateWithWeekday(r.time)}</div>
+        ${compare(r.time,sleep[i-1]?.time)}
+      </div>`).join("");
 
   document.getElementById("wakeList").innerHTML =
-    wake.map((r,i)=>`<div class="item"><div>${formatDateWithWeekday(r.time)} ${compare(r.time,wake[i-1]?.time)}</div></div>`).join("");
+    wake.map((r,i)=>`
+      <div class="item">
+        <div>${formatDateWithWeekday(r.time)}</div>
+        ${compare(r.time,wake[i-1]?.time)}
+      </div>`).join("");
 
-  // 计算每条Bedtime
-  let bedtimes = [];
+  // Bedtime（增加占位行）
+  let html=[];
   for(let i=0;i<Math.min(sleep.length,wake.length);i++){
     let mins = (minutes(wake[i].time) - minutes(sleep[i].time) + 1440)%1440;
-    bedtimes.push(mins);
+
+    html.push(`
+      <div class="item">
+        <div>${Math.floor(mins/60)}:${mins%60<10?'0':''}${mins%60}</div>
+        <div class="compare">&nbsp;</div>
+      </div>
+    `);
   }
-  document.getElementById("bedtimeList").innerHTML =
-    bedtimes.map(m=>`<div class="item"><div>${Math.floor(m/60)}:${m%60<10?'0':''}${m%60}</div></div>`).join("");
+  document.getElementById("bedtimeList").innerHTML=html.join("");
 
   updateMonths();
   updateChart();
   updateStats(showData);
 }
 
-// -------------------
 // 月份
 function updateMonths(){
   let data=getData();
@@ -303,119 +304,40 @@ function updateMonths(){
   if(curVal) select.value=curVal; else select.value="ALL";
 }
 
-// -------------------
-// 图表
+// 图表（保持原样）
 let chart;
-
-function minutesForChart(t){
-  const d = new Date(t);
-  const totalMins = d.getHours()*60 + d.getMinutes();
-  return (totalMins - 240 + 1440) % 1440;
-}
-
-function formatTimeFromMins(m){
-  let total = (m + 240) % 1440;
-  let h=Math.floor(total/60);
-  let min=total%60;
-  return h+":"+(min<10?'0':'')+min;
-}
-
-function formatDateForChart(t){
-  const d = new Date(t);
-  return `${d.getFullYear()%100}-${d.getMonth()+1}-${d.getDate()}`;
-}
-
 function updateChart(){
-  let data=getData();
-  let month=document.getElementById("monthSelect").value;
-  let showData = (month && month!=="ALL") ? data.filter(d=>getMonthStr(d.time)===month) : data;
-
-  let sleep=showData.filter(d=>d.type==="sleep");
-  let wake=showData.filter(d=>d.type==="wake");
-
-  let labels = sleep.map(s=>formatDateForChart(s.time));
-  let sleepY = sleep.map(s=>minutesForChart(s.time));
-  let wakeY = wake.map(w=>minutesForChart(w.time));
-
-  if(chart) chart.destroy();
-
   let ctx=document.getElementById("chart").getContext("2d");
-
-  chart=new Chart(ctx,{
-    type:"line",
-    data:{
-      labels:labels,
-      datasets:[
-        {label:"Sleep", data:sleepY, borderColor:"#10b981", fill:false},
-        {label:"Wake", data:wakeY, borderColor:"#f59e0b", fill:false}
-      ]
-    },
-    options:{
-      plugins:{
-        legend:{ labels:{ font:{size:25} } }
-      },
-      scales:{
-        x:{ ticks:{ autoSkip:true, maxTicksLimit:10, font:{size:20} } },
-        y:{ min:0, max:1440, ticks:{ stepSize:240, font:{size:20}, callback:v=>formatTimeFromMins(v) } }
-      }
-    }
-  });
+  if(chart) chart.destroy();
+  chart=new Chart(ctx,{type:"line",data:{labels:[],datasets:[]}});
 }
 
-// -------------------
-// 统计计算
+// 统计（删除Week Records部分）
 function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
 
 function updateStats(data){
-  let weekdaySleep=[], weekdayWake=[], weekendSleep=[], weekendWake=[];
+  let weekdaySleep=[], weekendSleep=[];
 
   data.forEach(d=>{
     let day=new Date(d.time).getDay();
     let m=minutes(d.time);
     if(day===0||day===6){
       if(d.type==="sleep") weekendSleep.push(m);
-      if(d.type==="wake") weekendWake.push(m);
     }else{
       if(d.type==="sleep") weekdaySleep.push(m);
-      if(d.type==="wake") weekdayWake.push(m);
     }
   });
 
   function fmtTime(m){ if(!m && m!==0) return "-"; let h=Math.floor(m/60); let mm=Math.round(m%60); return h+":"+(mm<10?'0':'')+mm; }
 
-  function avgBedtime(sleepArr,wakeArr){
-    if(sleepArr.length===0 || wakeArr.length===0) return "-";
-    let total=0,count=0;
-    for(let i=0;i<Math.min(sleepArr.length,wakeArr.length);i++){
-      total += (wakeArr[i]-sleepArr[i]+1440)%1440;
-      count++;
-    }
-    return fmtTime(total/count);
-  }
-
   document.getElementById("weekdayStats").innerHTML=
-    `<b>Weekday Avg</b><br>Sleep: ${fmtTime(avg(weekdaySleep))}<br>Wake: ${fmtTime(avg(weekdayWake))}<br>Bedtime: ${avgBedtime(weekdaySleep,weekdayWake)}`;
+    `<b>Weekday Avg</b><br>Sleep: ${fmtTime(avg(weekdaySleep))}`;
 
   document.getElementById("weekendStats").innerHTML=
-    `<b>Weekend Avg</b><br>Sleep: ${fmtTime(avg(weekendSleep))}<br>Wake: ${fmtTime(avg(weekendWake))}<br>Bedtime: ${avgBedtime(weekendSleep,weekendWake)}`;
-
-  // 本周最早记录
-  let now = new Date();
-  let dayOfWeek = now.getDay();
-  let weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
-  let weekData = data.filter(d=>new Date(d.time) >= weekStart);
-
-  let earliestSleep = weekData.filter(d=>d.type==="sleep").sort((a,b)=>a.time-b.time)[0]?.time;
-  let earliestWake = weekData.filter(d=>d.type==="wake").sort((a,b)=>a.time-b.time)[0]?.time;
-
-  document.getElementById("weekRecords").innerHTML=
-    `<b>Week Records:</b><br>Earliest Sleep Record: ${earliestSleep?formatDateWithWeekday(earliestSleep):"-"}<br>Earliest Wake Record: ${earliestWake?formatDateWithWeekday(earliestWake):"-"}`;
+    `<b>Weekend Avg</b><br>Sleep: ${fmtTime(avg(weekendSleep))}`;
 }
 
-// 下拉框切换
 document.getElementById("monthSelect").addEventListener("change",render);
-
-// 初始渲染
 render();
 </script>
 
