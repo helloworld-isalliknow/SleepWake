@@ -211,12 +211,23 @@ document.getElementById("exportBtn").addEventListener("click",()=>{
 // utils
 function minutes(t){ let d = new Date(t); return d.getHours()*60 + d.getMinutes(); }
 
+// ✅ 修复后的 compare
 function compare(current,prev){
   if(!prev || !current) return "";
+
   let diff = minutes(current) - minutes(prev);
+
+  // ✅ 跨天修正
+  if(diff > 720) diff -= 1440;
+  if(diff < -720) diff += 1440;
+
   let m = Math.abs(diff);
-  if(diff<0) return `<div class="compare earlier">↑ ${m} min earlier</div>`;
-  else return `<div class="compare later">↓ ${m} min later</div>`;
+
+  if(diff < 0){
+    return `<div class="compare earlier">↑ ${m} min earlier</div>`;
+  }else{
+    return `<div class="compare later">↓ ${m} min later</div>`;
+  }
 }
 
 function formatDateWithWeekday(t){
@@ -241,25 +252,25 @@ function render(){
   let sleep=showData.filter(d=>d.type==="sleep").sort((a,b)=>b.time-a.time);
   let wake=showData.filter(d=>d.type==="wake").sort((a,b)=>b.time-a.time);
 
-  // ✅ 核心修复：对齐
+  // 对齐
   if(sleep.length > wake.length){
     wake = [null, ...wake];
   }
 
-  // Sleep
+  // Sleep（✅ 用 i+1）
   sleepList.innerHTML =
     sleep.map((r,i)=>`
       <div class="item">
         <div>${formatDateWithWeekday(r.time)}</div>
-        ${compare(r.time,sleep[i-1]?.time)}
+        ${compare(r.time,sleep[i+1]?.time)}
       </div>`).join("");
 
-  // Wake
+  // Wake（✅ 用 i+1）
   wakeList.innerHTML =
     wake.map((r,i)=>`
       <div class="item">
         <div>${r ? formatDateWithWeekday(r.time) : ""}</div>
-        ${r ? compare(r.time,wake[i-1]?.time) : '<div class="compare">&nbsp;</div>'}
+        ${r ? compare(r.time,wake[i+1]?.time) : '<div class="compare">&nbsp;</div>'}
       </div>`).join("");
 
   // Bedtime
@@ -283,7 +294,7 @@ function render(){
   updateStats(showData);
 }
 
-// 其他函数保持不变（略）
+// 其余函数保持不变
 document.getElementById("monthSelect").addEventListener("change",render);
 render();
 </script>
