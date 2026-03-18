@@ -8,72 +8,25 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Metronome">
 <link rel="apple-touch-icon" href="apple-touch-icon1.png">
-
-
+  
 <style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont;
-  background:#f2f2f7;
-  margin:0;
-}
-
-.container{
-  padding:20px;
-}
-
-h1{
-  text-align:center;
-  font-size:60px;
-}
-
-.time{
-  text-align:center;
-  font-size:40px;
-  margin-bottom:40px;
-}
-
-.controls{
-  display:flex;
-  gap:10px;
-}
-
-button{
-  flex:1;
-  font-size:30px;
-  padding:10px;
-}
-
-.stats-container{
-  display:flex;
-  gap:10px;
-  margin-top:20px;
-}
-
-.stats-col{
-  flex:1;
-  background:#eee;
-  padding:10px;
-  font-size:25px;
-}
-
-.columns{
-  display:flex;
-  gap:10px;
-  margin-top:20px;
-}
-
-.col{
-  flex:1;
-}
-
-.item{
-  padding:5px;
-  border-bottom:1px solid #ddd;
-}
-
-.compare{ font-size:20px; }
+body { font-family:-apple-system, BlinkMacSystemFont; background:#f2f2f7; margin:0; padding:0; }
+.container{ width:100%; min-height:100vh; background:white; padding:20px; box-sizing:border-box; }
+h1{ text-align:center; margin-bottom:20px; font-size:60px; }
+.time{ font-size:40px; margin-bottom:40px; color:#555; text-align:center; }
+.controls{ display:flex; gap:10px; margin-bottom:20px; }
+button{ flex:1; padding:10px; font-size:30px; cursor:pointer; }
+.stats-container{ display:flex; gap:10px; margin-bottom:20px; }
+.stats-col{ flex:1; background:#f9fafb; padding:12px; border-radius:10px; font-size:25px; }
+.columns{ display:flex; gap:10px; margin-bottom:20px; }
+.col{ flex:1; background:#fafafa; padding:12px; border-radius:10px; text-align:center; }
+.col h3{ font-size:35px; margin-bottom:20px; }
+.item{ padding:6px; border-bottom:1px solid #eee; display:flex; flex-direction:column; align-items:center; font-size:28px; }
+.compare{ font-size:22px; }
 .earlier{ color:green; }
 .later{ color:red; }
+.chartbox{ margin-top:40px; }
+canvas{ max-height:400px; width:100%; }
 </style>
 </head>
 
@@ -84,186 +37,212 @@ button{
 <div class="time" id="time"></div>
 
 <div class="controls">
-<button id="recordBtn">Record</button>
-<button id="deleteBtn">Delete</button>
-<button id="exportBtn">Export</button>
+  <button id="recordBtn">Record</button>
+  <button id="deleteBtn">Delete Latest</button>
+  <button id="exportBtn">Export Data</button>
 </div>
 
 <div class="stats-container">
-<div class="stats-col" id="weekdayStats"></div>
-<div class="stats-col" id="weekendStats"></div>
+  <div class="stats-col" id="weekdayStats"></div>
+  <div class="stats-col" id="weekendStats"></div>
 </div>
 
 <select id="monthSelect"></select>
 
 <div class="columns">
-<div class="col">
-<h3>Sleep</h3>
-<div id="sleepList"></div>
+  <div class="col">
+    <h3>Sleep</h3>
+    <div id="sleepList"></div>
+  </div>
+  <div class="col">
+    <h3>Wake</h3>
+    <div id="wakeList"></div>
+  </div>
+  <div class="col">
+    <h3>Bedtime</h3>
+    <div id="bedtimeList"></div>
+  </div>
 </div>
 
-<div class="col">
-<h3>Wake</h3>
-<div id="wakeList"></div>
+<div class="chartbox">
+  <canvas id="chart"></canvas>
 </div>
-
-<div class="col">
-<h3>Bedtime</h3>
-<div id="bedtimeList"></div>
-</div>
-</div>
-
-<canvas id="chart"></canvas>
-
 </div>
 
 <script>
 // 时间
-setInterval(()=>{
-  time.innerText=new Date().toLocaleString();
-},1000);
-
-// storage
-function getData(){return JSON.parse(localStorage.getItem("sleepData")||"[]")}
-function saveData(d){localStorage.setItem("sleepData",JSON.stringify(d))}
-
-// record
-recordBtn.onclick=()=>{
-  let h=new Date().getHours()
-  let type=(h>=18||h<6)?"sleep":"wake"
-  let d=getData()
-  d.push({type,time:Date.now()})
-  saveData(d)
-  render()
+function updateClock(){
+  document.getElementById("time").innerText=new Date().toLocaleString();
 }
+setInterval(updateClock,1000);
+updateClock();
 
-// delete
-deleteBtn.onclick=()=>{
-  let d=getData()
-  d.sort((a,b)=>b.time-a.time)
-  d.shift()
-  saveData(d)
-  render()
-}
+// localStorage
+function getData(){ return JSON.parse(localStorage.getItem("sleepData")||"[]"); }
+function saveData(data){ localStorage.setItem("sleepData",JSON.stringify(data)); }
 
-// export
-exportBtn.onclick=()=>{
-  let blob=new Blob([JSON.stringify(getData())])
-  let a=document.createElement("a")
-  a.href=URL.createObjectURL(blob)
-  a.download="data.json"
-  a.click()
-}
+// Record
+document.getElementById("recordBtn").addEventListener("click",()=>{
+  let now = new Date();
+  let type = (now.getHours() >=18 || now.getHours()<6) ? "sleep":"wake";
+  let data = getData();
+  data.push({type,time:Date.now()});
+  saveData(data);
+  render();
+});
+
+// Delete
+document.getElementById("deleteBtn").addEventListener("click",()=>{
+  let data = getData();
+  if(data.length>0){
+    data.sort((a,b)=>b.time-a.time);
+    data.shift();
+    saveData(data);
+    render();
+  }
+});
+
+// Export
+document.getElementById("exportBtn").addEventListener("click",()=>{
+  let data = getData();
+  let blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "sleep-data.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
 
 // utils
-function minutes(t){
-  let d=new Date(t)
-  return d.getHours()*60+d.getMinutes()
-}
+function minutes(t){ return new Date(t).getHours()*60 + new Date(t).getMinutes(); }
 
-// ✅ 修复 compare
-function compare(cur,prev){
-  if(!prev) return ""
-
-  let diff=minutes(cur)-minutes(prev)
-
-  if(diff>720) diff-=1440
-  if(diff<-720) diff+=1440
-
-  let m=Math.abs(diff)
-
+function compare(current,prev){
+  if(!prev || !current) return "";
+  let diff = minutes(current)-minutes(prev);
+  if(diff>720) diff-=1440;
+  if(diff<-720) diff+=1440;
+  let m=Math.abs(diff);
   return diff<0
     ? `<div class="compare earlier">↑ ${m} min earlier</div>`
-    : `<div class="compare later">↓ ${m} min later</div>`
+    : `<div class="compare later">↓ ${m} min later</div>`;
 }
 
-function fmt(t){
-  let d=new Date(t)
-  return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2,"0")}`
+function formatDateWithWeekday(t){
+  const d = new Date(t);
+  const weekDays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  return `${d.getFullYear()%100}-${d.getMonth()+1}-${d.getDate()} ${weekDays[d.getDay()]} ${d.getHours()}:${d.getMinutes()<10?'0':''}${d.getMinutes()}`;
 }
 
-// ✅ 月份下拉
+function getMonthStr(t){
+  const d = new Date(t);
+  return d.getFullYear()+"-M"+(d.getMonth()+1);
+}
+
+// -------------------- 月份下拉
 function updateMonths(){
-  let d=getData()
-  let months=[...new Set(d.map(x=>{
-    let dt=new Date(x.time)
-    return dt.getFullYear()+"-"+(dt.getMonth()+1)
-  }))]
-
-  monthSelect.innerHTML="<option value='ALL'>ALL</option>"+
-    months.map(m=>`<option>${m}</option>`).join("")
+  let data = getData();
+  let months = [...new Set(data.map(d=>getMonthStr(d.time)))];
+  let select = document.getElementById("monthSelect");
+  let cur = select.value;
+  select.innerHTML="<option value='ALL'>ALL</option>"+months.map(m=>`<option>${m}</option>`).join("");
+  if(cur) select.value=cur; else select.value="ALL";
 }
 
-// ✅ 统计
-function avg(arr){
-  if(!arr.length) return "-"
-  let m=arr.map(x=>minutes(x.time))
-  return Math.round(m.reduce((a,b)=>a+b)/m.length)
-}
+// -------------------- 统计
+function avg(arr){ return arr.length ? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : null; }
 
 function updateStats(data){
-  let weekday=data.filter(x=>{
-    let d=new Date(x.time).getDay()
-    return d>0 && d<6
-  })
-
-  let weekend=data.filter(x=>{
-    let d=new Date(x.time).getDay()
-    return d===0 || d===6
-  })
-
-  weekdayStats.innerText="Weekday Avg: "+avg(weekday)
-  weekendStats.innerText="Weekend Avg: "+avg(weekend)
-}
-
-// ✅ 图表
-let chart
-function updateChart(){
-  let d=getData().slice(-10)
-
-  let labels=d.map(x=>fmt(x.time))
-  let values=d.map(x=>minutes(x.time))
-
-  if(chart) chart.destroy()
-
-  chart=new Chart(document.getElementById("chart"),{
-    type:"line",
-    data:{
-      labels,
-      datasets:[{data:values}]
+  let weekdaySleep=[], weekdayWake=[], weekendSleep=[], weekendWake=[];
+  data.forEach(d=>{
+    let day=new Date(d.time).getDay();
+    if(day===0||day===6){
+      if(d.type==="sleep") weekendSleep.push(minutes(d.time));
+      if(d.type==="wake") weekendWake.push(minutes(d.time));
+    }else{
+      if(d.type==="sleep") weekdaySleep.push(minutes(d.time));
+      if(d.type==="wake") weekdayWake.push(minutes(d.time));
     }
-  })
+  });
+  function fmtM(m){ if(!m && m!==0) return "-"; return Math.floor(m/60)+":"+(m%60<10?'0':'')+m%60; }
+  function avgBedtime(sleepArr,wakeArr){
+    if(sleepArr.length===0||wakeArr.length===0) return "-";
+    let total=0;
+    for(let i=0;i<Math.min(sleepArr.length,wakeArr.length);i++){
+      total += (wakeArr[i]-sleepArr[i]+1440)%1440;
+    }
+    return fmtM(Math.round(total/Math.min(sleepArr.length,wakeArr.length)));
+  }
+
+  document.getElementById("weekdayStats").innerHTML=
+    `<b>Weekday Avg</b><br>Sleep: ${fmtM(avg(weekdaySleep))}<br>Wake: ${fmtM(avg(weekdayWake))}<br>Bedtime: ${avgBedtime(weekdaySleep,weekdayWake)}`;
+  document.getElementById("weekendStats").innerHTML=
+    `<b>Weekend Avg</b><br>Sleep: ${fmtM(avg(weekendSleep))}<br>Wake: ${fmtM(avg(weekendWake))}<br>Bedtime: ${avgBedtime(weekendSleep,weekendWake)}`;
 }
 
-// render
+// -------------------- 图表
+let chart;
+function minutesForChart(t){
+  let d=new Date(t);
+  return (d.getHours()*60+d.getMinutes()-240+1440)%1440;
+}
+function formatTimeFromMins(m){ let total=(m+240)%1440; return Math.floor(total/60)+":"+(total%60<10?'0':'')+total%60; }
+function formatDateForChart(t){ const d=new Date(t); return `${d.getFullYear()%100}-${d.getMonth()+1}-${d.getDate()}`; }
+
+function updateChart(){
+  let data = getData();
+  let month = document.getElementById("monthSelect").value;
+  let showData = (month && month!=="ALL") ? data.filter(d=>getMonthStr(d.time)===month) : data;
+  let sleep = showData.filter(d=>d.type==="sleep");
+  let wake = showData.filter(d=>d.type==="wake");
+
+  let labels = sleep.map(s=>formatDateForChart(s.time));
+  let sleepY = sleep.map(s=>minutesForChart(s.time));
+  let wakeY = wake.map(w=>minutesForChart(w.time));
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById("chart").getContext("2d"),{
+    type:"line",
+    data:{ labels, datasets:[
+      {label:"Sleep", data:sleepY, borderColor:"#10b981", fill:false},
+      {label:"Wake", data:wakeY, borderColor:"#f59e0b", fill:false}
+    ]},
+    options:{ plugins:{ legend:{ labels:{ font:{size:20} } } }, scales:{ x:{ ticks:{ font:{size:16} } }, y:{ min:0, max:1440, ticks:{ stepSize:240, font:{size:14}, callback:v=>formatTimeFromMins(v) } } } }
+  });
+}
+
+// -------------------- render
 function render(){
-  let data=getData()
+  let data = getData();
+  let month = document.getElementById("monthSelect").value;
+  let showData = (month && month!=="ALL") ? data.filter(d=>getMonthStr(d.time)===month) : data;
 
-  let sleep=data.filter(x=>x.type==="sleep").sort((a,b)=>b.time-a.time)
-  let wake=data.filter(x=>x.type==="wake").sort((a,b)=>b.time-a.time)
+  let sleep = showData.filter(d=>d.type==="sleep").sort((a,b)=>b.time-a.time);
+  let wake = showData.filter(d=>d.type==="wake").sort((a,b)=>b.time-a.time);
 
-  if(sleep.length>wake.length) wake=[null,...wake]
+  if(sleep.length>wake.length) wake=[null,...wake];
 
-  sleepList.innerHTML=sleep.map((r,i)=>
-    `<div class="item">${fmt(r.time)}${compare(r.time,sleep[i+1]?.time)}</div>`
-  ).join("")
+  document.getElementById("sleepList").innerHTML = sleep.map((r,i)=>
+    `<div class="item"><div>${formatDateWithWeekday(r.time)}</div>${compare(r.time,sleep[i+1]?.time)}</div>`
+  ).join("");
 
-  wakeList.innerHTML=wake.map((r,i)=>
-    `<div class="item">${r?fmt(r.time):""}${r?compare(r.time,wake[i+1]?.time):""}</div>`
-  ).join("")
+  document.getElementById("wakeList").innerHTML = wake.map((r,i)=>
+    `<div class="item"><div>${r?formatDateWithWeekday(r.time):""}</div>${r?compare(r.time,wake[i+1]?.time):'<div class="compare">&nbsp;</div>'}</div>`
+  ).join("");
 
-  bedtimeList.innerHTML=sleep.map((s,i)=>{
-    if(!wake[i]) return ""
-    let m=(minutes(wake[i].time)-minutes(s.time)+1440)%1440
-    return `<div class="item">${Math.floor(m/60)}h ${m%60}m</div>`
-  }).join("")
+  document.getElementById("bedtimeList").innerHTML = sleep.map((s,i)=>{
+    if(!wake[i]) return "";
+    let m = (minutes(wake[i].time)-minutes(s.time)+1440)%1440;
+    return `<div class="item"><div>${Math.floor(m/60)}:${m%60<10?'0':''}${m%60}</div><div class="compare">&nbsp;</div></div>`;
+  }).join("");
 
-  updateMonths()
-  updateStats(data)
-  updateChart()
+  updateMonths();
+  updateStats(showData);
+  updateChart();
 }
 
-render()
+document.getElementById("monthSelect").addEventListener("change",render);
+render();
+
 </script>
 
 </body>
